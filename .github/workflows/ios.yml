@@ -1,0 +1,62 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Herramientas
+        run: brew install xcodegen ldid
+
+      - name: Generar proyecto Xcode
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Compilar sin firmar
+        working-directory: ios
+        run: |
+          xcodebuild \
+            -project HealthBridge.xcodeproj \
+            -scheme HealthBridge \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Empaquetar IPA (con entitlements de HealthKit)
+        working-directory: ios
+        run: |
+          APP=build/Build/Products/Release-iphoneos/HealthBridge.app
+          ls "$APP"
+          ldid -SSupport/HealthBridge.entitlements "$APP/HealthBridge"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qr HealthBridge.ipa Payload
+          ls -la HealthBridge.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: health-bridge-ipa
+          path: ios/HealthBridge.ipa
+
+      - name: Publicar IPA en la release "ios-latest"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ios-latest
+          name: IPA iOS más reciente (sin firmar)
+          make_latest: false
+          files: ios/HealthBridge.ipa
