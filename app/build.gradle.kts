@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.pablo.healthbridge"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.pablo.healthbridge"
